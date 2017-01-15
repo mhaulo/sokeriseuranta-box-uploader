@@ -265,6 +265,7 @@ def upload_data():
 			buffer = StringIO()
 			entry_date = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
 			bg_value = str(raw_to_bg(mydata['RawValue'], mydata['FilteredValue']))
+			sensor_raw = mydata['RawValue']
 			print "Data at " + entry_date + ": "
 			print "RawValue: " + mydata['RawValue']
 			print "FilteredValue: " + mydata['FilteredValue']
@@ -273,7 +274,7 @@ def upload_data():
 			print "BG value: " + bg_value
 			print "\n"
 			
-			data = '{"log_entries": [{"log_entry": {"date": "' + entry_date + '", "value": "' + bg_value + '", "entry_type": "sensor_bg" }}]}'
+			data = '{"log_entries": [{"log_entry": {"date": "' + entry_date + '", "value": "' + bg_value + '", "sensor_raw": "' + sensor_raw + '", "entry_type": "sensor_bg" }}]}'
 						
 			print "Sending data:"
 			print data
