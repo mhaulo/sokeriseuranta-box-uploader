@@ -20,9 +20,6 @@
 # shell cmd to emulate client: 
 # echo -e '{"numberOfRecords":1,"version":1}\n' | nc -w 3 127.0.0.1 50005
 
-# If you have more than one device you can use the remoteHosts list below to consolidate all of
-# them to a single ip address
-
 import json
 import logging
 import socket
@@ -41,27 +38,16 @@ import re
 import requests
 import json
 
+version = "0.1"
 
 if platform.system() != "Windows":
 	import grp
-
 	DEFAULT_LOG_FILE = "/tmp/python-usb-wixel.log"
 else:
 	DEFAULT_LOG_FILE = "python-usb-wixel.log"
 
-HOST = ''  # All interfaces
-PORT = 50005  # xdrip standard port
 
-# Set a list of remote hosts in the format 192.168.1.50:50005, ... to consolidate
-# multiple remote usb wixels or parakeet webservices to a single instance
-# the script will poll the others for the latest data every 10 seconds.
-
-remoteHosts = ""
-
-# Set the parakeet url to your receiver.cgi url, eg https://your-parakeet-receiver.appspot.com/receiver.cgi
-# and then all received data will be relayed to a parakeet app engine instance which is good for bypassing
-# network address translation etc. App engine software is at: https://github.com/jamorham/Parakeet-App-Engine
-
+# Sokeriseuranta API info. These are read from a config file
 api_endpoint = ""
 api_token = ""
 user_email = ""
@@ -74,10 +60,7 @@ use_raspberry_pi_internal_serial_port = False
 
 # Or you can store the configuration in a file which overrides whatever is set in this script
 
-config = SafeConfigParser({'HOST': HOST,
-						   'PORT': PORT,
-						   'remoteHosts': remoteHosts,
-						   'api_endpoint': api_endpoint,
+config = SafeConfigParser({'api_endpoint': api_endpoint,
 						   'api_token': api_token,
 						   'user_email': user_email,
 						   'use_raspberry_pi_internal_serial_port': False,
@@ -90,29 +73,21 @@ config_path="/home/pi/Documents/python-usb-wixel-xdrip/python-usb-wixel.cfg"
 if (os.path.isfile(config_path)):
 	config.read(config_path)
 	print "Loading configuration from: " + config_path
-	HOST = config.get('main', 'HOST').strip()
-	PORT = config.getint('main', 'PORT')
-	remoteHosts = config.get('main', 'remoteHosts').strip()
 	api_endpoint = config.get('main', 'api_endpoint').strip()
 	user_email = config.get('main', 'user_email').strip()
 	api_token = config.get('main', 'api_token').strip()
+	
 	try:
 		use_raspberry_pi_internal_serial_port = config.getboolean('main', 'use_raspberry_pi_internal_serial_port')
 	except:
 		use_raspberry_pi_internal_serial_port = False
+		
 	DEFAULT_LOG_FILE = config.get('main', 'DEFAULT_LOG_FILE').strip()
 else:
 	print "No custom config file: " + config_path
 
-# remoteHosts is now specified as , separated string then converted to old style list
-if (len(remoteHosts) > 0):
-	remoteHosts = remoteHosts.split(',')
-else:
-	remoteHosts = []
 
 # output template
-
-
 mydata = {"TransmitterId": "0", "_id": 1, "CaptureDateTime": 0, "RelativeTime": 0, "ReceivedSignalStrength": 0,
 		  "RawValue": 0, "TransmissionId": 0, "BatteryLife": 0, "UploadAttempts": 0, "Uploaded": 0,
 		  "UploaderBatteryLife": 0, "FilteredValue": 0}
@@ -123,9 +98,9 @@ mydata = {"TransmitterId": "0", "_id": 1, "CaptureDateTime": 0, "RelativeTime": 
 def serialThread(dummy):
 	print "entering serial loop - waiting for data from wixel"
 	global mydata
+	
 	while 1:
 		try:
-
 			# sometimes the wixel reboots and comes back as a different
 			# device - this code seemed to catch that happening
 			# more complex code might be needed if the pi has other
@@ -170,7 +145,7 @@ def serialThread(dummy):
 				mydata['ReceivedSignalStrength'] = datax[4]
 				mydata['TransmissionId'] = datax[5]
 
-				upload_data()
+				#upload_data()
 
 			except Exception, e:
 				print "Exception: ", e
@@ -185,71 +160,7 @@ def serialThread(dummy):
 			print "Serial close exception", e
 
 		time.sleep(6)
-
-
-# socket thread
-
-def clientThread(connlocal):
-	try:
-		connlocal.settimeout(10)
-		while True:
-			data = connlocal.recv(1024)
-			reply = ''
-			if not data:
-				break
-			decoded = json.loads(data)
-			print json.dumps(decoded, sort_keys=True, indent=4)
-
-			mydata['RelativeTime'] = str((int(time.time()) * 1000) - int(mydata['CaptureDateTime']))
-
-			if mydata['RawValue'] != 0:
-				reply = reply + json.dumps(mydata) + "\n\n"
-			else:
-				print "we do not have any data to send yet"
-
-			print reply
-
-			connlocal.sendall(reply)
-		connlocal.close()
-
-	except Exception, e:
-		print "Exception in clientThread: ", e
-
-
-def consolidationThread():
-	global mydata
-	global remoteHosts
-	print "Starting consolidationThread"
-	while True:
-		for host in remoteHosts:
-			try:
-
-				host = "//" + host  # must be cleaner way to do this
-				remote_address = (urlparse(host).hostname, urlparse(host).port)
-				# print "Trying: ",remote_address
-				sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-				sock.settimeout(5)  # could be longer if not on local network
-
-				sock.connect(remote_address)
-
-				sock.sendall("{\"numberOfRecords\":1,\"version\":1}\n")
-
-				data = sock.recv(1024)
-
-				decoded_data = json.loads(data)
-				if (int(decoded_data['RelativeTime'])+100) < ((int(time.time()) * 1000) - int(mydata['CaptureDateTime'])):
-					# print "Received NEWER: ",data
-					print "NEWEST FROM: ", remote_address
-					mydata = decoded_data
-					upload_data()
-
-				sock.close()
-
-			except Exception, e:
-				print e, remote_address
-
-		time.sleep(10)
-
+		
 
 def upload_data():
 	global api_endpoint
@@ -311,54 +222,24 @@ if (platform.system() != "Windows"):
 		if os.getuid() == 0:
 			print "Cannot drop root - exit!"
 			sys.exit()
+			
 logger = logging.getLogger('python-usb-wixel')
 hdlr = logging.FileHandler(DEFAULT_LOG_FILE)
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
 hdlr.setFormatter(formatter)
 logger.addHandler(hdlr)
 logger.addHandler(logging.StreamHandler())
-
-# choose your logging level as required
-
 logger.setLevel(logging.INFO)
-# logger.setLevel(logging.WARNING)
 
-logger.info("Startup")
+logger.info("Sokeriseuranta Box - version " + version)
 
-# Create socket
-
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
-print 'Socket created'
-
-# Bind socket to local host and port
-
-try:
-	s.bind((HOST, PORT))
-except socket.error as msg:
-	print 'Bind failed. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
-	sys.exit()
-
-s.listen(10)
-
+# start a thread to listen for serial data
 threading.Thread(target=serialThread, args=("",)).start()
 
-if len(remoteHosts) > 0:
-	t = threading.Thread(target=consolidationThread, args=()).start()
-
-
 # main busy loop
-# wait for connections and start a thread
 try:
-	print "Waiting for connections"
-
-	while 1:
-		conn, addr = s.accept()
-		print 'Connected with ' + addr[0] + ':' + str(addr[1])
-
-		threading.Thread(target=clientThread, args=(conn,)).start()
-	s.close()
+	while(1):
+		sleep(2)	
 
 except KeyboardInterrupt:
 	print "Shutting down"
