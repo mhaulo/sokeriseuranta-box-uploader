@@ -1,24 +1,20 @@
 #!/usr/bin/python
 
-# jamorham 
+# Sokeriseuranta Box uploader
 
-# quick and dirty python script to emulate some of the function of 'dexterity'
+# This a "quick and dirty python script" which reads Dexcom G4 transmitter data
+# from serial line and then uploads it to a REST API (Sokeriseuranta by default).
 
-# connect a wixel to usb and then set wifi-wixel feature in xdrip to point
-# to the ip address of the host(s) running this script.
+# This software is intended to be used with sokeriseuranta-mobile-wixel-xDrip Wixel 
+# firmware and to be run on a Raspberry Pi.
+# Get the Wixel code from https://github.com/mhaulo/sokeriseuranta-mobile-wixel-xDrip
 
-# intended for raspberry pi or other linux box
-
-# wixel xdrip bridge needs to have output printf like this:
-
+# Wixel needs to have output printf like this, if connected via usb;
 # printf("%lu %lu %lu %hhu %d %hhu %d \r\n", pPkt->src_addr,dex_num_decoder(pPkt->raw),dex_num_decoder(pPkt->filtered)*2, pPkt->battery, getPacketRSSI(pPkt),pPkt->txId,adcConvertToMillivolts(adcRead(0)));
+#... Or this, if connected via GPIO:
+# printf("%lu %hhu %d \r\n", dex_num_decoder(pPkt->raw), pPkt->battery, adcConvertToMillivolts(adcRead(0)));
 
-# at time of writing the standard version uses a different printf which doesn't work with
-# dexterity or this code. The full wixel sdk and sdcc work fine on the raspberry pi so the
-# whole development of the wixel code can be done on the pi. 
-
-# shell cmd to emulate client: 
-# echo -e '{"numberOfRecords":1,"version":1}\n' | nc -w 3 127.0.0.1 50005
+# This script is based on code by jamorham (jarmoham.github.io)
 
 import json
 import logging
