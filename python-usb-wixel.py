@@ -36,12 +36,7 @@ import json
 
 version = "0.1"
 
-if platform.system() != "Windows":
-	import grp
-	DEFAULT_LOG_FILE = "/tmp/python-usb-wixel.log"
-else:
-	DEFAULT_LOG_FILE = "python-usb-wixel.log"
-
+DEFAULT_LOG_FILE = "/tmp/python-usb-wixel.log"
 
 # Sokeriseuranta API info. These are read from a config file
 api_endpoint = ""
@@ -209,22 +204,22 @@ def raw_to_bg(raw_value, filtered_value):
 # MAIN
 
 # some init
-if (platform.system() != "Windows"):
-	if os.getuid() == 0:
-		logger.info("Dropping root")
-		os.setgid(1000)  # make sure this user is in the dialout group or setgid to dialout
-		try:
-			os.setgid(grp.getgrnam("dialout").gr_gid)
-		except:
-			logger.exception("Couldn't find the dialout group to use")
 
-		os.setuid(1000)
-		
-		if os.getuid() == 0:
-			logger.error("Cannot drop root - exit!")
-			sys.exit()
-		else:
-			logger.info("Dropped to user: ", os.getuid())
+if os.getuid() == 0:
+	logger.info("Dropping root")
+	os.setgid(1000)  # make sure this user is in the dialout group or setgid to dialout
+	try:
+		os.setgid(grp.getgrnam("dialout").gr_gid)
+	except:
+		logger.exception("Couldn't find the dialout group to use")
+
+	os.setuid(1000)
+	
+	if os.getuid() == 0:
+		logger.error("Cannot drop root - exit!")
+		sys.exit()
+	else:
+		logger.info("Dropped to user: ", os.getuid())
 			
 logger = logging.getLogger('python-usb-wixel')
 hdlr = logging.FileHandler(DEFAULT_LOG_FILE)
