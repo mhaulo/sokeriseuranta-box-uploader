@@ -72,7 +72,7 @@ config_path="/home/pi/Documents/python-usb-wixel-xdrip/python-usb-wixel.cfg"
 
 if (os.path.isfile(config_path)):
 	config.read(config_path)
-	print "Loading configuration from: " + config_path
+	logger.info("Loading configuration from: " + config_path)
 	api_endpoint = config.get('main', 'api_endpoint').strip()
 	user_email = config.get('main', 'user_email').strip()
 	api_token = config.get('main', 'api_token').strip()
@@ -84,7 +84,8 @@ if (os.path.isfile(config_path)):
 		
 	DEFAULT_LOG_FILE = config.get('main', 'DEFAULT_LOG_FILE').strip()
 else:
-	print "No custom config file: " + config_path
+	print "Config file " + config_path + " not found, using default values"
+	logger.info("Config file " + config_path + " not found, using default values")
 
 
 # output template
@@ -96,7 +97,7 @@ mydata = {"TransmitterId": "0", "_id": 1, "CaptureDateTime": 0, "RelativeTime": 
 # threads
 
 def serialThread(dummy):
-	print "entering serial loop - waiting for data from wixel"
+	logger.info("entering serial loop - waiting for data from wixel")
 	global mydata
 	
 	while 1:
@@ -132,10 +133,10 @@ def serialThread(dummy):
 				if datax[0] == "\n":
 					print "Detected loss of serial sync - restarting"
 					logger.warning("Serial line error: " + serial_line)
+					logger.info("Detected loss of serial sync - restarting")
 					break
 
 				# update dictionary - no sanity checking here
-
 				mydata['CaptureDateTime'] = str(int(time.time())) + "000"
 				mydata['RelativeTime'] = "0"
 				mydata['TransmitterId'] = datax[0]
@@ -145,19 +146,22 @@ def serialThread(dummy):
 				mydata['ReceivedSignalStrength'] = datax[4]
 				mydata['TransmissionId'] = datax[5]
 
-				#upload_data()
+				upload_data()
 
 			except Exception, e:
 				print "Exception: ", e
+				logger.exception("Exception: ", e)
 
 		except serial.serialutil.SerialException, e:
 			print "Serial exception ", e
+			logger.exception("Serial exception ", e)
 			time.sleep(1)
 
 		try:
 			ser.close()
 		except Exception, e:
 			print "Serial close exception", e
+			logger.exception("Serial close exception", e)
 
 		time.sleep(6)
 		
@@ -177,11 +181,12 @@ def upload_data():
 			entry_date = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
 			bg_value = str(raw_to_bg(mydata['RawValue'], mydata['FilteredValue']))
 			sensor_raw = mydata['RawValue']
+			
 			print "Data at " + entry_date + ": "
 			print "RawValue: " + mydata['RawValue']
-			print "FilteredValue: " + mydata['FilteredValue']
-			print "Transmitter ID: " + mydata['TransmitterId']
-			print "Battery life: " + mydata['BatteryLife']
+			#print "FilteredValue: " + mydata['FilteredValue']
+			#print "Transmitter ID: " + mydata['TransmitterId']
+			#print "Battery life: " + mydata['BatteryLife']
 			print "BG value: " + bg_value
 			print "\n"
 			
@@ -210,18 +215,20 @@ def raw_to_bg(raw_value, filtered_value):
 # some init
 if (platform.system() != "Windows"):
 	if os.getuid() == 0:
-		print "Dropping root"
+		logger.info("Dropping root")
 		os.setgid(1000)  # make sure this user is in the dialout group or setgid to dialout
 		try:
 			os.setgid(grp.getgrnam("dialout").gr_gid)
 		except:
-			print "Couldn't find the dialout group to use"
+			logger.exception("Couldn't find the dialout group to use")
 
 		os.setuid(1000)
-		print "Dropped to user: ", os.getuid()
+		
 		if os.getuid() == 0:
-			print "Cannot drop root - exit!"
+			logger.error("Cannot drop root - exit!")
 			sys.exit()
+		else:
+			logger.info("Dropped to user: ", os.getuid())
 			
 logger = logging.getLogger('python-usb-wixel')
 hdlr = logging.FileHandler(DEFAULT_LOG_FILE)
@@ -231,7 +238,8 @@ logger.addHandler(hdlr)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
 
-logger.info("Sokeriseuranta Box - version " + version)
+logger.info("Starting up")
+print "Sokeriseuranta Box - version " + version
 
 # start a thread to listen for serial data
 threading.Thread(target=serialThread, args=("",)).start()
@@ -243,4 +251,5 @@ try:
 
 except KeyboardInterrupt:
 	print "Shutting down"
+	logger.info("Shutting down")
 	os.kill(os.getpid(), signal.SIGKILL)
